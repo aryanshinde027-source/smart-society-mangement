@@ -1,0 +1,132 @@
+SOCIETY MANAGEMENT - POSTMAN TEST ORDER
+Base URL: http://localhost:8080
+
+1) ADD SOCIETY
+POST {{baseUrl}}/society/add
+Body:
+{
+  "societyname": "Green Valley Society",
+  "address": "Main Road",
+  "city": "Akola",
+  "pincode": 444001,
+  "registrationNumber": 1001
+}
+
+2) ADD FLAT (use societyId from step 1)
+POST {{baseUrl}}/flat/add
+Body:
+{
+  "flatnumber": 101,
+  "wing": "A",
+  "floortype": "2BHK",
+  "status": "Occupied",
+  "societyId": 1
+}
+
+3) ADD RESIDENT (use flatId from step 2)
+POST {{baseUrl}}/resident/add
+Body:
+{
+  "residentName": "Rahul Sharma",
+  "mobilenumber": "9876543210",
+  "email": "rahul@gmail.com",
+  "gender": "Male",
+  "age": 25,
+  "role": "Owner",
+  "flatId": 1
+}
+
+4) ADD MAINTENANCE (use flatId)
+POST {{baseUrl}}/maintaince/add
+Body:
+{
+  "amount": 2000,
+  "amountdue": "0",
+  "paymentDate": 20260810,
+  "paymentStatus": "Paid",
+  "flatId": 1
+}
+
+5) ADD NOTICE (use societyId)
+POST {{baseUrl}}/notice/add
+Body:
+{
+  "title": "Society Meeting",
+  "description": "Monthly society meeting at 7 PM",
+  "noticeDate": 20260810,
+  "societyId": 1
+}
+
+6) ADD COMPLAINT (use residentId)
+POST {{baseUrl}}/complaint/add
+Body:
+{
+  "title": "Water Leakage",
+  "description": "Water leakage in bathroom",
+  "status": "Open",
+  "complaintDate": 20260810,
+  "residentId": 1
+}
+
+GET / VERIFY RELATIONSHIPS
+GET {{baseUrl}}/flat/getFlatWithSociety/1
+GET {{baseUrl}}/flat/getFlatWithResidents/1
+GET {{baseUrl}}/flat/getFlatWithMaintenance/1
+GET {{baseUrl}}/resident/getResidentWithComplaints/1
+GET {{baseUrl}}/notice/getNoticeWithSociety/1
+GET {{baseUrl}}/complaint/getComplaintWithResident/1
+GET {{baseUrl}}/maintaince/getMaintainceWithFlat/1
+GET {{baseUrl}}/society/getSocietyWithFlats/1
+GET {{baseUrl}}/society/getSocietyWithNotices/1
+
+CRUD UPDATE BODY EXAMPLES
+PUT {{baseUrl}}/flat/update/1
+{
+  "flatnumber": 101,
+  "wing": "A",
+  "floortype": "2BHK",
+  "status": "Occupied",
+  "societyId": 1
+}
+
+PUT {{baseUrl}}/resident/update/1
+{
+  "residentName": "Rahul Sharma",
+  "mobilenumber": "9876543210",
+  "email": "rahul@gmail.com",
+  "gender": "Male",
+  "age": 26,
+  "role": "Owner",
+  "flatId": 1
+}
+
+PUT {{baseUrl}}/maintaince/update/1
+{
+  "amount": 2000,
+  "amountdue": "0",
+  "paymentDate": 20260810,
+  "paymentStatus": "Paid",
+  "flatId": 1
+}
+
+PUT {{baseUrl}}/notice/update/1
+{
+  "title": "Updated Society Meeting",
+  "description": "Meeting at 7 PM",
+  "noticeDate": 20260811,
+  "societyId": 1
+}
+
+PUT {{baseUrl}}/complaint/update/1
+{
+  "title": "Water Leakage",
+  "description": "Bathroom leakage",
+  "status": "In Progress",
+  "complaintDate": 20260810,
+  "residentId": 1
+}
+
+IMPORTANT
+- Do not omit societyId, flatId or residentId from the relevant ADD/UPDATE request.
+- If the referenced ID does not exist, the API rejects the request and does not save a row.
+- Existing old rows that already contain NULL relationships may need to be removed/recreated before starting the corrected application because the entities now enforce NOT NULL relationships.

@@ -1,0 +1,76 @@
+package com.test.Dto;
+
+import java.time.LocalDate;
+
+public class BookingDto {
+
+    private int bookingid;
+    private LocalDate bookingDate;
+    private String timeSlot;
+    private String status;
+    private int residentId;
+    private int facilid;
+
+    public BookingDto() {
+        super();
+    }
+
+    public BookingDto(int bookingid, LocalDate bookingDate, String timeSlot,
+            String status, int residentId, int facilid) {
+        super();
+        this.bookingid = bookingid;
+        this.bookingDate = bookingDate;
+        this.timeSlot = timeSlot;
+        this.status = status;
+        this.residentId = residentId;
+        this.facilid = facilid;
+    }
+
+    public int getBookingid() {
+        return bookingid;
+    }
+
+    public void setBookingid(int bookingid) {
+        this.bookingid = bookingid;
+    }
+
+    public LocalDate getBookingDate() {
+        return bookingDate;
+    }
+
+    public void setBookingDate(LocalDate bookingDate) {
+        this.bookingDate = bookingDate;
+    }
+
+    public String getTimeSlot() {
+        return timeSlot;
+    }
+
+    public void setTimeSlot(String timeSlot) {
+        this.timeSlot = timeSlot;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public int getResidentId() {
+        return residentId;
+    }
+
+    public void setResidentId(int residentId) {
+        this.residentId = residentId;
+    }
+
+    public int getFacilid() {
+        return facilid;
+    }
+
+    public void setFacilid(int facilid) {
+        this.facilid = facilid;
+    }
+}

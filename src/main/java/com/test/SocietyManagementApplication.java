@@ -8,6 +8,7 @@ public class SocietyManagementApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(SocietyManagementApplication.class, args);
+	    System.out.print("Done Seema");	
 	}
 
 }

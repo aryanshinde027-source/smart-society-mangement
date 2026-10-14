@@ -1,437 +1,480 @@
 import 'package:flutter/material.dart';
+import 'package:society_management/services/facilityservice.dart';
 
-class BookingScreen extends StatefulWidget {
-  const BookingScreen({super.key});
+class FacilitiesScreen extends StatefulWidget {
+  const FacilitiesScreen({super.key});
 
   @override
-  State<BookingScreen> createState() => _BookingScreenState();
+  State<FacilitiesScreen> createState() => _FacilitiesScreenState();
 }
 
-class _BookingScreenState extends State<BookingScreen> {
+class _FacilitiesScreenState extends State<FacilitiesScreen> {
+  final FacilityService _service = FacilityService();
+
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController purposeController = TextEditingController();
+  final _name = TextEditingController();
+  final _type = TextEditingController();
+  final _description = TextEditingController();
+  final _location = TextEditingController();
+  final _societyId = TextEditingController();
+  final _search = TextEditingController();
 
-  String selectedFacility = 'Clubhouse';
-  String selectedSlot = '10:00 AM - 12:00 PM';
-  DateTime selectedDate = DateTime.now();
+  String _status = 'Available';
+  int? _editingId;
+  bool _loading = false;
+  List<Map<String, dynamic>> _facilities = [];
 
-  final List<Map<String, dynamic>> facilities = [
-    {
-      'name': 'Clubhouse',
-      'icon': Icons.meeting_room_outlined,
-      'description': 'Events and gatherings',
-      'price': '₹500 / hour',
-      'color': Colors.blue,
-    },
-    {
-      'name': 'Gym',
-      'icon': Icons.fitness_center,
-      'description': 'Fitness and workout',
-      'price': '₹100 / hour',
-      'color': Colors.orange,
-    },
-    {
-      'name': 'Swimming Pool',
-      'icon': Icons.pool,
-      'description': 'Swimming and recreation',
-      'price': '₹200 / hour',
-      'color': Colors.teal,
-    },
-    {
-      'name': 'Community Hall',
-      'icon': Icons.groups_outlined,
-      'description': 'Meetings and functions',
-      'price': '₹800 / hour',
-      'color': Colors.purple,
-    },
-  ];
+  static const Color bg = Color(0xFF0B1120);
+  static const Color surface = Color(0xFF151F32);
+  static const Color blue = Color(0xFF60A5FA);
+  static const Color muted = Color(0xFF94A3B8);
 
-  final List<String> timeSlots = [
-    '08:00 AM - 10:00 AM',
-    '10:00 AM - 12:00 PM',
-    '12:00 PM - 02:00 PM',
-    '02:00 PM - 04:00 PM',
-    '04:00 PM - 06:00 PM',
-    '06:00 PM - 08:00 PM',
-  ];
-
-  final List<Map<String, String>> bookings = [];
+  @override
+  void initState() {
+    super.initState();
+    _loadFacilities();
+  }
 
   @override
   void dispose() {
-    purposeController.dispose();
+    _name.dispose();
+    _type.dispose();
+    _description.dispose();
+    _location.dispose();
+    _societyId.dispose();
+    _search.dispose();
     super.dispose();
   }
 
-  Future<void> pickDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: selectedDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 180)),
-    );
+  Future<void> _loadFacilities() async {
+    setState(() => _loading = true);
 
-    if (date != null && mounted) {
-      setState(() => selectedDate = date);
+    try {
+      final data = await _service.getAllFacilities();
+      if (!mounted) return;
+      setState(() => _facilities = data);
+    } catch (e) {
+      if (!mounted) return;
+      _message('Could not load facilities: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  void confirmBooking() {
-    if (!_formKey.currentState!.validate()) return;
+  void _message(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
 
-    final date =
-        '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}';
+  void _clearForm() {
+    _name.clear();
+    _type.clear();
+    _description.clear();
+    _location.clear();
+    _societyId.clear();
 
     setState(() {
-      bookings.insert(0, {
-        'facility': selectedFacility,
-        'date': date,
-        'slot': selectedSlot,
-        'purpose': purposeController.text.trim(),
-        'status': 'Pending',
-      });
+      _editingId = null;
+      _status = 'Available';
+    });
+  }
+
+  void _editFacility(Map<String, dynamic> item) {
+    _name.text = '${item['facilname'] ?? ''}';
+    _type.text = '${item['type'] ?? ''}';
+    _description.text = '${item['description'] ?? ''}';
+    _location.text = '${item['location'] ?? ''}';
+    _societyId.text = '${item['societyId'] ?? ''}';
+
+    setState(() {
+      _editingId = int.tryParse('${item['facilid']}');
+      _status = '${item['status'] ?? 'Available'}';
     });
 
-    purposeController.clear();
+    _showForm();
+  }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Booking request added successfully!'),
-        backgroundColor: Colors.green,
+  Future<void> _saveFacility() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final societyId = int.tryParse(_societyId.text.trim());
+    if (societyId == null || societyId <= 0) {
+      _message('Enter a valid Society ID');
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      if (_editingId == null) {
+        await _service.addFacility(
+          facilname: _name.text.trim(),
+          type: _type.text.trim(),
+          description: _description.text.trim(),
+          location: _location.text.trim(),
+          status: _status,
+          societyId: societyId,
+        );
+        _message('Facility added successfully');
+      } else {
+        await _service.updateFacility(
+          facilid: _editingId!,
+          facilname: _name.text.trim(),
+          type: _type.text.trim(),
+          description: _description.text.trim(),
+          location: _location.text.trim(),
+          status: _status,
+          societyId: societyId,
+        );
+        _message('Facility updated successfully');
+      }
+
+      if (!mounted) return;
+      Navigator.pop(context);
+      _clearForm();
+      await _loadFacilities();
+    } catch (e) {
+      if (!mounted) return;
+      _message('Save failed: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _deleteFacility(int id) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: surface,
+        title: const Text(
+          'Delete facility?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'This facility will be deleted.',
+          style: TextStyle(color: muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _loading = true);
+    try {
+      await _service.deleteFacility(id);
+      _message('Facility deleted successfully');
+      await _loadFacilities();
+    } catch (e) {
+      _message('Delete failed: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _showForm() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: surface,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              MediaQuery.of(context).viewInsets.bottom + 20,
+            ),
+            child: SingleChildScrollView(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _editingId == null ? 'Add Facility' : 'Edit Facility',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _field(_name, 'Facility name'),
+                    _field(_type, 'Type'),
+                    _field(_description, 'Description'),
+                    _field(_location, 'Location'),
+                    _field(_societyId, 'Society ID', number: true),
+                    const SizedBox(height: 10),
+                    const Text('Status', style: TextStyle(color: muted)),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: _status,
+                      dropdownColor: surface,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: _decoration('Select status'),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'Available',
+                          child: Text('Available'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Unavailable',
+                          child: Text('Unavailable'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Maintenance',
+                          child: Text('Maintenance'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _status = value);
+                          setSheetState(() {});
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 22),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _loading ? null : _saveFacility,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: blue,
+                          foregroundColor: bg,
+                          padding: const EdgeInsets.all(15),
+                        ),
+                        child: Text(
+                          _editingId == null
+                              ? 'Add Facility'
+                              : 'Update Facility',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  InputDecoration _decoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: muted),
+      filled: true,
+      fillColor: bg,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF334155)),
+      ),
+    );
+  }
+
+  Widget _field(
+    TextEditingController controller,
+    String label, {
+    bool number = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: number ? TextInputType.number : TextInputType.text,
+        style: const TextStyle(color: Colors.white),
+        decoration: _decoration(label),
+        validator: (value) {
+          if (value == null || value.trim().isEmpty) {
+            return '$label is required';
+          }
+          if (number && int.tryParse(value.trim()) == null) {
+            return 'Enter a valid number';
+          }
+          return null;
+        },
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final filtered = _facilities.where((item) {
+      final query = _search.text.toLowerCase();
+      return '${item['facilname'] ?? ''}'.toLowerCase().contains(query) ||
+          '${item['type'] ?? ''}'.toLowerCase().contains(query) ||
+          '${item['location'] ?? ''}'.toLowerCase().contains(query);
+    }).toList();
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: bg,
       appBar: AppBar(
-        title: const Text(
-          'Facility Booking',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: const Color(0xFF2563EB),
-        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: bg,
+        foregroundColor: Colors.white,
+        title: const Text('Facility Management'),
+        actions: [
+          IconButton(
+            onPressed: _loadFacilities,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF2563EB), Color(0xFF0284C7)],
-                ),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.calendar_month, size: 42, color: Colors.white),
-                  SizedBox(height: 12),
-                  Text(
-                    'Book a Facility',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          _clearForm();
+          _showForm();
+        },
+        backgroundColor: blue,
+        foregroundColor: bg,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Facility'),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _search,
+              onChanged: (_) => setState(() {}),
+              style: const TextStyle(color: Colors.white),
+              decoration: _decoration(
+                'Search facilities',
+              ).copyWith(prefixIcon: const Icon(Icons.search, color: muted)),
+            ),
+          ),
+          Expanded(
+            child: _loading && _facilities.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : filtered.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No facilities found',
+                      style: TextStyle(color: muted),
                     ),
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    'Choose a facility and your preferred time.',
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                ],
-              ),
-            ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadFacilities,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) {
+                        final item = filtered[index];
+                        final id = int.tryParse('${item['facilid']}') ?? 0;
 
-            const SizedBox(height: 24),
-
-            const Text(
-              'Available Facilities',
-              style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
-            ),
-
-            const SizedBox(height: 14),
-
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: facilities.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.95,
-              ),
-              itemBuilder: (context, index) {
-                final facility = facilities[index];
-                final isSelected = selectedFacility == facility['name'];
-
-                return InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () {
-                    setState(() {
-                      selectedFacility = facility['name'] as String;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: isSelected
-                            ? const Color(0xFF2563EB)
-                            : const Color(0xFFE2E8F0),
-                        width: isSelected ? 2 : 1,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: (facility['color'] as Color)
-                              .withValues(alpha: 0.12),
-                          child: Icon(
-                            facility['icon'] as IconData,
-                            color: facility['color'] as Color,
+                        return Card(
+                          color: surface,
+                          margin: const EdgeInsets.only(bottom: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          facility['name'] as String,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          facility['description'] as String,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          facility['price'] as String,
-                          style: const TextStyle(
-                            color: Color(0xFF2563EB),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (isSelected)
-                          const Align(
-                            alignment: Alignment.centerRight,
-                            child: Icon(
-                              Icons.check_circle,
-                              color: Color(0xFF2563EB),
-                              size: 20,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 24),
-
-            const Text(
-              'Booking Details',
-              style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
-            ),
-
-            const SizedBox(height: 14),
-
-            Card(
-              color: Colors.white,
-              elevation: 1,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      InkWell(
-                        onTap: pickDate,
-                        child: InputDecorator(
-                          decoration: InputDecoration(
-                            labelText: 'Booking Date',
-                            prefixIcon: const Icon(Icons.calendar_today),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: Text(
-                            '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 18),
-
-                      DropdownButtonFormField<String>(
-                        value: selectedSlot,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          labelText: 'Time Slot',
-                          prefixIcon: const Icon(Icons.access_time),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        items: timeSlots.map((slot) {
-                          return DropdownMenuItem(
-                            value: slot,
-                            child: Text(
-                              slot,
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() => selectedSlot = value);
-                          }
-                        },
-                      ),
-
-                      const SizedBox(height: 18),
-
-                      TextFormField(
-                        controller: purposeController,
-                        maxLines: 3,
-                        decoration: InputDecoration(
-                          labelText: 'Booking Purpose',
-                          hintText: 'Why do you need this facility?',
-                          prefixIcon: const Icon(Icons.description_outlined),
-                          alignLabelWithHint: true,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Please enter booking purpose';
-                          }
-                          return null;
-                        },
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: confirmBooking,
-                          icon: const Icon(Icons.event_available),
-                          label: const Text('Request Booking'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2563EB),
-                            foregroundColor: Colors.white,
+                          child: Padding(
                             padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const CircleAvatar(
+                                      backgroundColor: Color(0xFF1E3A5F),
+                                      child: Icon(Icons.apartment, color: blue),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        '${item['facilname'] ?? 'Unnamed facility'}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed: () => _editFacility(item),
+                                      icon: const Icon(
+                                        Icons.edit_outlined,
+                                        color: blue,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed: id == 0
+                                          ? null
+                                          : () => _deleteFacility(id),
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.redAccent,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                _detail('Facility ID', '$id'),
+                                _detail('Type', '${item['type'] ?? '-'}'),
+                                _detail(
+                                  'Description',
+                                  '${item['description'] ?? '-'}',
+                                ),
+                                _detail(
+                                  'Location',
+                                  '${item['location'] ?? '-'}',
+                                ),
+                                _detail(
+                                  'Society ID',
+                                  '${item['societyId'] ?? '-'}',
+                                ),
+                                const SizedBox(height: 8),
+                                Chip(
+                                  label: Text('${item['status'] ?? 'Unknown'}'),
+                                  backgroundColor: const Color(0xFF1E3A5F),
+                                  labelStyle: const TextStyle(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 28),
-
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'My Bookings',
-                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Chip(label: Text('${bookings.length}')),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            if (bookings.isEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(26),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Column(
-                  children: [
-                    Icon(Icons.event_busy, size: 44, color: Colors.grey),
-                    SizedBox(height: 10),
-                    Text(
-                      'No bookings yet',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'Your booking requests will appear here.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ],
-                ),
-              )
-            else
-              ...bookings.map((booking) {
-                return Card(
-                  color: Colors.white,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: Color(0xFFDBEAFE),
-                      child: Icon(
-                        Icons.calendar_month,
-                        color: Color(0xFF2563EB),
-                      ),
-                    ),
-                    title: Text(
-                      booking['facility']!,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        '${booking['date']} • ${booking['slot']}\n'
-                        'Purpose: ${booking['purpose']}',
-                      ),
-                    ),
-                    isThreeLine: true,
-                    trailing: const Text(
-                      'Pending',
-                      style: TextStyle(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.w600,
-                      ),
+                        );
+                      },
                     ),
                   ),
-                );
-              }),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detail(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 105,
+            child: Text(label, style: const TextStyle(color: muted)),
+          ),
+          Expanded(
+            child: Text(value, style: const TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }
